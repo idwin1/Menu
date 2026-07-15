@@ -2,10 +2,12 @@ import os
 import sys
 import subprocess
 import tkinter as tk
+from tkinter import ttk
 from tkinter import messagebox
 from pathlib import Path
 import shutil
 import json
+import threading
 
 def obtener_ruta_raiz_real():
     """Detecta la carpeta raíz del proyecto de forma dinámica"""
@@ -17,6 +19,43 @@ def obtener_ruta_raiz_real():
     if ruta.name.lower() == "apps":
         return ruta.parent
     return ruta
+
+def ejecutar_actualizador_con_ui(ruta_actualizador):
+    """Muestra una pantalla de carga mientras el actualizador corre en segundo plano"""
+    ventana_carga = tk.Tk()
+    ventana_carga.title("Buscando actualizaciones")
+    ventana_carga.geometry("320x120")
+    ventana_carga.resizable(False, False)
+    
+    # Truco para centrar la ventanita en la pantalla
+    ventana_carga.eval('tk::PlaceWindow . center')
+    
+    lbl_info = tk.Label(ventana_carga, text="Buscando y descargando actualizaciones...\nPor favor, no cierres el programa.", font=("Arial", 10))
+    lbl_info.pack(pady=15)
+    
+    # Barra de progreso en modo 'indeterminate' (movimiento continuo)
+    barra = ttk.Progressbar(ventana_carga, mode='indeterminate', length=250)
+    barra.pack(pady=5)
+    barra.start(15) # Velocidad de la animación
+    
+    def hilo_actualizador():
+        try:
+            # Ejecutamos el actualizador (esto tomará su tiempo)
+            subprocess.run([ruta_actualizador], creationflags=0x08000000, timeout=50)
+        except subprocess.TimeoutExpired:
+            print("El actualizador tardó demasiado tiempo en responder.")
+        except Exception as e:
+            print(f"No se pudo lanzar el actualizador: {e}")
+        finally:
+            # Cuando el actualizador termine (o falle), cerramos la ventana de carga de forma segura
+            ventana_carga.after(0, ventana_carga.destroy)
+
+    # Iniciamos el proceso de actualización en un hilo aparte
+    hilo = threading.Thread(target=hilo_actualizador, daemon=True)
+    hilo.start()
+    
+    # Iniciamos el bucle de la ventana para que se vea la animación
+    ventana_carga.mainloop()
 
 def revisar_y_aplicar_actualizacion_menu():
     ruta_raiz = obtener_ruta_raiz_real()
@@ -65,13 +104,7 @@ def revisar_y_aplicar_actualizacion_menu():
     # --- PASO 2: EJECUCIÓN NORMAL (Solo si Estado_Menu es 0) ---
     ruta_actualizador = os.path.join(ruta_raiz, "apps", "actualizador.exe")
     if os.path.exists(ruta_actualizador):
-        try:
-            # Se ejecuta el actualizador y esperamos síncronamente a que termine
-            subprocess.run([ruta_actualizador], creationflags=0x08000000, timeout=30)
-        except subprocess.TimeoutExpired:
-            print("El actualizador tardó demasiado tiempo en responder.")
-        except Exception as e:
-            print(f"No se pudo lanzar el actualizador: {e}")
+        ejecutar_actualizador_con_ui(ruta_actualizador)
 
     # Volvemos a leer el JSON tras la ejecución del actualizador para ver si dejó una orden de cambio (Estado 1)
     if os.path.exists(ruta_json):
