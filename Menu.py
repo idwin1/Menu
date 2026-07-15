@@ -20,6 +20,7 @@ def obtener_ruta_raiz_real():
         return ruta.parent
     return ruta
 
+#docuementacion
 def ejecutar_actualizador_con_ui(ruta_actualizador):
     """Muestra una pantalla de carga mientras el actualizador corre en segundo plano"""
     ventana_carga = tk.Tk()
