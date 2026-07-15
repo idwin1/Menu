@@ -2,12 +2,14 @@ import os
 import sys
 import subprocess
 import tkinter as tk
-from tkinter import ttk
 from tkinter import messagebox
 from pathlib import Path
 import shutil
 import json
 import threading
+import customtkinter as ctk
+from datetime import datetime
+import time
 
 def obtener_ruta_raiz_real():
     """Detecta la carpeta raíz del proyecto de forma dinámica"""
@@ -22,49 +24,147 @@ def obtener_ruta_raiz_real():
 
 #docuementacion
 def ejecutar_actualizador_con_ui(ruta_actualizador):
-    """Muestra una pantalla de carga mientras el actualizador corre en segundo plano"""
-    ventana_carga = tk.Tk()
-    ventana_carga.title("Buscando actualizaciones")
-    ventana_carga.geometry("320x120")
-    ventana_carga.resizable(False, False)
-    
-    # Truco para centrar la ventanita en la pantalla
-    ventana_carga.eval('tk::PlaceWindow . center')
-    
-    lbl_info = tk.Label(ventana_carga, text="Buscando y descargando actualizaciones...\nPor favor, no cierres el programa.", font=("Arial", 10))
-    lbl_info.pack(pady=15)
-    
-    # Barra de progreso en modo 'indeterminate' (movimiento continuo)
-    barra = ttk.Progressbar(ventana_carga, mode='indeterminate', length=250)
-    barra.pack(pady=5)
-    barra.start(15) # Velocidad de la animación
-    
-    def hilo_actualizador():
-        try:
-            # Ejecutamos el actualizador (esto tomará su tiempo)
-            subprocess.run([ruta_actualizador], creationflags=0x08000000, timeout=50)
-        except subprocess.TimeoutExpired:
-            print("El actualizador tardó demasiado tiempo en responder.")
-        except Exception as e:
-            print(f"No se pudo lanzar el actualizador: {e}")
-        finally:
-            # Cuando el actualizador termine (o falle), cerramos la ventana de carga de forma segura
-            ventana_carga.after(0, ventana_carga.destroy)
+    """Muestra la UI de customtkinter y lee el progreso real del actualizador"""
+    ctk.set_appearance_mode("dark")
+    ctk.set_default_color_theme("blue")
 
-    # Iniciamos el proceso de actualización en un hilo aparte
-    hilo = threading.Thread(target=hilo_actualizador, daemon=True)
-    hilo.start()
+    ANCHO = 850
+    ALTO = 500
+
+    ventana_carga = ctk.CTk()
+    ventana_carga.title("Actualizador")
+    ventana_carga.resizable(False, False)
+
+    x = (ventana_carga.winfo_screenwidth() // 2) - (ANCHO // 2)
+    y = (ventana_carga.winfo_screenheight() // 2) - (ALTO // 2)
+    ventana_carga.geometry(f"{ANCHO}x{ALTO}+{x}+{y}")
+    ventana_carga.protocol("WM_DELETE_WINDOW", lambda: None) # Desactiva la 'X' para que no rompan el proceso
+
+    # --- PANEL IZQUIERDO ---
+    left = ctk.CTkFrame(ventana_carga, width=250, fg_color="#1f6aa5", corner_radius=0)
+    left.pack(side="left", fill="y")
+    ctk.CTkLabel(left, text="🚀", font=("Segoe UI Emoji", 80)).pack(pady=(70,20))
+    ctk.CTkLabel(left, text="Actualizador", font=("Segoe UI",18)).pack(pady=5)
+    ctk.CTkLabel(left, text="Buscando versión...", font=("Segoe UI",13)).pack(side="bottom", pady=30)
+
+    # --- PANEL DERECHO ---
+    right = ctk.CTkFrame(ventana_carga, corner_radius=0)
+    right.pack(side="right", fill="both", expand=True)
+
+    ctk.CTkLabel(right, text="Actualizando aplicación", font=("Segoe UI",28,"bold")).pack(pady=(30,10))
     
-    # Iniciamos el bucle de la ventana para que se vea la animación
+    mensaje = ctk.CTkLabel(right, text="Iniciando conexión", font=("Segoe UI",15))
+    mensaje.pack()
+
+    barra = ctk.CTkProgressBar(right, width=500, height=18, corner_radius=20)
+    barra.pack(pady=(30,5))
+    barra.set(0)
+
+    porcentaje = ctk.CTkLabel(right, text="0 %", font=("Segoe UI",15,"bold"))
+    porcentaje.pack()
+
+    frame_estado = ctk.CTkFrame(right)
+    frame_estado.pack(pady=20)
+
+    lbl1 = ctk.CTkLabel(frame_estado, text="⟳ Buscar actualizaciones", anchor="w", width=300)
+    lbl2 = ctk.CTkLabel(frame_estado, text="○ Descargar archivos", anchor="w", width=300)
+    lbl3 = ctk.CTkLabel(frame_estado, text="○ Instalar actualización", anchor="w", width=300)
+    lbl1.pack(anchor="w", padx=20, pady=3)
+    lbl2.pack(anchor="w", padx=20, pady=3)
+    lbl3.pack(anchor="w", padx=20, pady=3)
+
+    logs = ctk.CTkTextbox(right, width=520, height=120, font=("Consolas",12))
+    logs.pack(pady=10)
+    logs.configure(state="disabled")
+
+    def agregar_log(texto):
+        hora = datetime.now().strftime("%H:%M:%S")
+        logs.configure(state="normal")
+        logs.insert("end", f"[{hora}] {texto}\n")
+        logs.see("end")
+        logs.configure(state="disabled")
+
+    # --- LÓGICA DE INTERCEPTACIÓN ---
+    estado_archivos = {"total": 1, "actual": 0}
+
+    def procesar_actualizacion():
+        try:
+            # Ejecutamos redirigiendo la salida para leerla en tiempo real
+            proceso = subprocess.Popen(
+                [ruta_actualizador],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                creationflags=0x08000000
+            )
+
+            for linea in iter(proceso.stdout.readline, ''):
+                linea = linea.strip()
+                if not linea: continue
+
+                if linea.startswith("[UI] TAREAS:"):
+                    estado_archivos["total"] = int(linea.split(":")[1])
+                    ventana_carga.after(0, lambda: [
+                        lbl1.configure(text="✔ Buscar actualizaciones"),
+                        lbl2.configure(text="⟳ Descargar archivos")
+                    ])
+                
+                elif linea.startswith("[UI] PROGRESO:"):
+                    # Extraer el número y el texto: "[UI] PROGRESO:2|Descargando app.py"
+                    _, datos = linea.split(":", 1)
+                    paso_str, msg = datos.split("|", 1)
+                    
+                    estado_archivos["actual"] = int(paso_str)
+                    progreso_real = estado_archivos["actual"] / estado_archivos["total"]
+                    
+                    ventana_carga.after(0, lambda m=msg, p=progreso_real: actualizar_visuales(m, p))
+                    ventana_carga.after(0, lambda m=msg: agregar_log(m))
+                
+                elif linea.startswith("[UI] DONE"):
+                    ventana_carga.after(0, finalizar_ui)
+                
+                else:
+                    # Logs generales (errores de github, librerías, etc.)
+                    ventana_carga.after(0, lambda l=linea: agregar_log(l))
+
+            proceso.stdout.close()
+            proceso.wait()
+
+        except Exception as e:
+            ventana_carga.after(0, lambda: agregar_log(f"Error crítico: {e}"))
+            ventana_carga.after(3000, ventana_carga.destroy)
+
+    def actualizar_visuales(msg, p):
+        barra.set(p)
+        porcentaje.configure(text=f"{int(p * 100)} %")
+        mensaje.configure(text=msg)
+
+    def finalizar_ui():
+        barra.set(1.0)
+        porcentaje.configure(text="100 %")
+        mensaje.configure(text="¡Actualización completada!")
+        lbl2.configure(text="✔ Descargar archivos")
+        lbl3.configure(text="✔ Instalación completada")
+        agregar_log("Todo está al día. Iniciando sistema...")
+        # Espera 2.5 segundos para que el usuario lea que terminó, y cierra la ventana
+        ventana_carga.after(2500, ventana_carga.quit)
+
+    # Iniciar el hilo de lectura y arrancar la interfaz
+    threading.Thread(target=procesar_actualizacion, daemon=True).start()
     ventana_carga.mainloop()
+    ventana_carga.destroy()
+
 
 def revisar_y_aplicar_actualizacion_menu():
     ruta_raiz = obtener_ruta_raiz_real()
     ruta_nuevo_menu = os.path.join(ruta_raiz, "apps", "Menu_NUEVO.exe")
     ruta_menu_actual = os.path.join(ruta_raiz, "Menu.exe")
     ruta_json = os.path.join(ruta_raiz, "apps", "config.json")
+    ruta_actualizador = os.path.join(ruta_raiz, "apps", "actualizador.exe")
+    ruta_actualizador_nuevo = os.path.join(ruta_raiz, "apps", "actualizador_NUEVO.exe")
 
-    # Leer el estado desde el JSON de forma segura
+    # --- PASO 1: TU RELEVO ORIGINAL DEL MENÚ (Funciona perfecto) ---
     estado_menu = 0
     if os.path.exists(ruta_json):
         try:
@@ -72,15 +172,14 @@ def revisar_y_aplicar_actualizacion_menu():
                 datos = json.load(f)
                 estado_menu = datos.get("Estado_Menu", 0)
         except Exception:
-            estado_menu = 0
+            pass
 
-    # --- PASO 1: SI EL ESTADO ES 1, EJECUTAMOS EL RELEVO DE FORMA INMEDIATA ---
     if estado_menu == 1 and os.path.exists(ruta_nuevo_menu):
         try:
             # 1. Copiar el Menu_NUEVO.exe sobre el Menu.exe de la raíz
             shutil.copy2(ruta_nuevo_menu, ruta_menu_actual)
             
-            # 2. Cambiar de inmediato el estado en el JSON a 0 para que nadie vuelva a entrar aquí
+            # 2. Cambiar de inmediato el estado en el JSON a 0
             try:
                 with open(ruta_json, "r", encoding="utf-8") as f:
                     datos = json.load(f)
@@ -91,38 +190,55 @@ def revisar_y_aplicar_actualizacion_menu():
                 pass
                 
             # 3. Levantar el menú principal definitivo desde la raíz
-            subprocess.Popen([ruta_menu_actual])
+            subprocess.Popen([ruta_menu_actual], cwd=ruta_raiz)
             
-            # 4. Forzar la auto-eliminación de Menu_NUEVO.exe de forma asíncrona
+            # 4. Auto-eliminación original (El taskkill que tenías)
             comando_limpieza = f'taskkill /F /PID {os.getpid()} & timeout /t 1 /nobreak & del "{ruta_nuevo_menu}"'
             subprocess.Popen(comando_limpieza, shell=True, creationflags=0x08000000)
             
-            os._exit(0) # Terminar el proceso hijo inmediatamente
+            os._exit(0)
         except Exception as e:
             print(f"Error crítico en el relevo por JSON: {e}")
             sys.exit(1)
 
-    # --- PASO 2: EJECUCIÓN NORMAL (Solo si Estado_Menu es 0) ---
-    ruta_actualizador = os.path.join(ruta_raiz, "apps", "actualizador.exe")
+    # --- PASO 2: EJECUCIÓN DE LA INTERFAZ DEL ACTUALIZADOR ---
     if os.path.exists(ruta_actualizador):
         ejecutar_actualizador_con_ui(ruta_actualizador)
 
-    # Volvemos a leer el JSON tras la ejecución del actualizador para ver si dejó una orden de cambio (Estado 1)
+    # --- PASO 3: LECTURA POST-ACTUALIZACIÓN ---
+    estado_menu = 0
+    estado_actualizador = 0
     if os.path.exists(ruta_json):
         try:
             with open(ruta_json, "r", encoding="utf-8") as f:
                 datos = json.load(f)
                 estado_menu = datos.get("Estado_Menu", 0)
+                estado_actualizador = datos.get("Estado_Actualizador", 0)
         except Exception:
-            estado_menu = 0
+            pass
 
-    # Si el actualizador dejó un estado 1 y el ejecutable existe, lanzamos el relevo
+    # --- PASO 4: RELEVO DEL ACTUALIZADOR (En silencio) ---
+    if estado_actualizador == 1 and os.path.exists(ruta_actualizador_nuevo):
+        try:
+            shutil.copy2(ruta_actualizador_nuevo, ruta_actualizador) 
+            os.remove(ruta_actualizador_nuevo)
+            
+            with open(ruta_json, "r", encoding="utf-8") as f:
+                datos = json.load(f)
+            datos["Estado_Actualizador"] = 0
+            with open(ruta_json, "w", encoding="utf-8") as f:
+                json.dump(datos, f, indent=4, ensure_ascii=False)
+        except Exception:
+            pass
+
+    # --- PASO 5: TU LANZAMIENTO ORIGINAL DEL MENÚ ---
+    # Si el actualizador detectó un menú nuevo, le pasamos la batuta al Menu_NUEVO.exe
     if estado_menu == 1 and os.path.exists(ruta_nuevo_menu):
-        print("Sincronización de menú detectada en JSON. Iniciando proceso de relevo...")
-        subprocess.Popen([ruta_nuevo_menu], creationflags=0x08000000)
+        print("Sincronización de menú detectada. Iniciando proceso de relevo...")
+        subprocess.Popen([ruta_nuevo_menu], cwd=ruta_raiz, creationflags=0x08000000)
         sys.exit(0)
 
-
+        
 class MenuporAplicaciones:
     def __init__(self, ventana_principal):
         self.root = ventana_principal
@@ -160,7 +276,7 @@ class MenuporAplicaciones:
             todos_los_exe = list(self.carpeta_apps.glob("*.exe"))
             ejecutables = [
                 exe for exe in todos_los_exe 
-                if exe.name.lower() not in ["actualizador.exe", "menu_nuevo.exe"]
+                if exe.name.lower() not in ["actualizador.exe", "menu_nuevo.exe","actualizador_nuevo.exe"]
             ]
 
         if not ejecutables:
