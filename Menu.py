@@ -81,6 +81,12 @@ def ejecutar_actualizador_con_ui(ruta_actualizador):
         hora = datetime.now().strftime("%H:%M:%S")
         logs.configure(state="normal")
         logs.insert("end", f"[{hora}] {texto}\n")
+
+        # <-- NUEVO: Mantener solo las últimas 100 líneas en RAM
+        lineas_totales = int(logs.index('end-1c').split('.')[0])
+        if lineas_totales > 100:
+            logs.delete("1.0", f"{lineas_totales - 100}.0")
+
         logs.see("end")
         logs.configure(state="disabled")
 
