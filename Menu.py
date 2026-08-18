@@ -378,11 +378,12 @@ class MenuporAplicaciones:
         if any(w in nombre for w in ["juego", "game"]): return "🎮"
         if any(w in nombre for w in ["web", "net", "chrome"]): return "🌐"
         if any(w in nombre for w in ["texto", "word", "notas"]): return "📄"
-        if any(w in nombre for w in ["config", "ajuste"]): return "⚙️"
-        if any(w in nombre for w in ["musica", "audio"]): return "🎵"
+        if any(w in nombre for w in ["file","merge"]): return "📦"
+        if any(w in nombre for w in ["evidencias"]): return "📁"
         if any(w in nombre for w in ["foto", "imagen", "diseño"]): return "🎨"
         if any(w in nombre for w in ["datos", "sql", "excel"]): return "📊"
         if any(w in nombre for w in ["limpiar", "clean", "hash", "md5"]): return "🔐"
+        if any(w in nombre for w in ["tomarcaptura"]): return "📸"
         return "✨"
 
     def cargar_datos_aplicaciones(self):
