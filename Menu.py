@@ -384,6 +384,7 @@ class MenuporAplicaciones:
         if any(w in nombre for w in ["datos", "sql", "excel"]): return "📊"
         if any(w in nombre for w in ["limpiar", "clean", "hash", "md5"]): return "🔐"
         if any(w in nombre for w in ["tomarcaptura"]): return "📸"
+        if any(w in nombre for w in ["insertdata"]): return "📈"
         return "✨"
 
     def cargar_datos_aplicaciones(self):
