@@ -184,6 +184,8 @@ def revisar_y_aplicar_actualizacion_menu():
 
     # --- PASO 1: RELEVO ORIGINAL DEL MENÚ ---
     estado_menu = 0
+    actualizaciones_activas = True
+
     if os.path.exists(ruta_json):
         try:
             with open(ruta_json, "r", encoding="utf-8") as f:
@@ -213,7 +215,10 @@ def revisar_y_aplicar_actualizacion_menu():
 
     # --- PASO 2: EJECUCIÓN DEL ACTUALIZADOR ---
     if os.path.exists(ruta_actualizador):
-        ejecutar_actualizador_con_ui(ruta_actualizador)
+        if actualizaciones_activas:
+            ejecutar_actualizador_con_ui(ruta_actualizador)
+        else:
+            print("Las actualizaciones automáticas están desactivadas por config.json")
 
     # --- PASO 3: LECTURA POST-ACTUALIZACIÓN ---
     estado_menu = 0
