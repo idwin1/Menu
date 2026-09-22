@@ -1,0 +1,37 @@
+name: Compilar y Subir Menu.exe
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-release:
+    runs-on: windows-latest
+
+    steps:
+    - name: Clonar el código local
+      uses: actions/checkout@v4
+
+    - name: Configurar Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Instalar librerías base
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyinstaller customtkinter
+        # Si tienes un archivo requirements.txt con más cosas, descomenta la siguiente línea:
+        pip install -r requirements.txt
+
+    - name: Compilar a .exe
+      run: |
+        # Asumiendo que tu archivo principal se llama Menu.py. Si no, ajusta el nombre.
+        pyinstaller --noconfirm --onefile --windowed --name "Menu" Menu.py
+
+    - name: Subir archivo a Ejecutables
+      env:
+        GH_TOKEN: ${{ secrets.TOKEN_EJECUTABLES }}
+      run: |
+        # Carga el archivo en el tag 'produccion' y sobrescribe si ya existe (--clobber)
+        gh release upload produccion dist/Menu.exe --repo idwin1/Ejecutables --clobber
