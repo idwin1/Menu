@@ -34,4 +34,4 @@ jobs:
         GH_TOKEN: ${{ secrets.TOKEN_EJECUTABLES }}
       run: |
         # Carga el archivo en el tag 'produccion' y sobrescribe si ya existe (--clobber)
-        gh release upload produccion dist/Menu.exe --repo idwin1/Ejecutables --clobber
+        gh release upload Produccion dist/Menu.exe --repo idwin1/Ejecutables --clobber
