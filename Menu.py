@@ -382,7 +382,7 @@ class MenuporAplicaciones:
         if any(w in nombre for w in ["calc", "math", "numero"]): return "🧮"
         if any(w in nombre for w in ["juego", "game"]): return "🎮"
         if any(w in nombre for w in ["web", "net", "chrome"]): return "🌐"
-        if any(w in nombre for w in ["texto", "word", "NI"]): return "📄"
+        if any(w in nombre for w in ["texto", "word", "ni"]): return "📄"
         if any(w in nombre for w in ["file","merge"]): return "📦"
         if any(w in nombre for w in ["evidencias"]): return "📁"
         if any(w in nombre for w in ["foto", "imagen", "diseño"]): return "🎨"
