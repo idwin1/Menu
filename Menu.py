@@ -272,6 +272,16 @@ class MenuporAplicaciones:
 
         self.carpeta_apps = obtener_ruta_raiz_real() / "apps"
         
+        # --- NUEVO: Leer configuración de tamaño guardada ---
+        self.archivo_config = self.carpeta_apps / "config.json"
+        self.tamano_vista = "Grande" # Tamaño por defecto
+        if self.archivo_config.exists():
+            try:
+                with open(self.archivo_config, "r", encoding="utf-8") as f:
+                    self.tamano_vista = json.load(f).get("Tamano_Vista", "Grande")
+            except Exception: pass
+        
+        
         # --- SEGURIDAD AL CREAR DIRECTORIO ---
         try:
             if not self.carpeta_apps.exists():
@@ -319,6 +329,18 @@ class MenuporAplicaciones:
         self.lbl_saludo = ctk.CTkLabel(self.header_row, text=self.obtener_saludo(), font=("Segoe UI", 24, "bold"), text_color=TEXT_MAIN)
         self.lbl_saludo.pack(side="left")
 
+        # --- NUEVO: Botón selector de tamaño ---
+        self.seg_tamano = ctk.CTkSegmentedButton(
+            self.header_row, 
+            values=["Pequeño", "Mediano", "Grande"],
+            command=self.cambiar_tamano_vista,
+            fg_color=BG_CARD,
+            selected_color=ACCENT,
+            selected_hover_color=ACCENT_HOVER
+        )
+        self.seg_tamano.set(self.tamano_vista)
+        self.seg_tamano.pack(side="left", padx=20)
+
         self.search_var = tk.StringVar()
         self.search_var.trace("w", self.filtrar_aplicaciones)
         self.search_entry = ctk.CTkEntry(
@@ -339,6 +361,26 @@ class MenuporAplicaciones:
         self.frame_scroll = ctk.CTkScrollableFrame(self.main_area, fg_color="transparent")
         self.frame_scroll.pack(fill="both", expand=True)
         self.frame_scroll.grid_columnconfigure((0, 1, 2), weight=1)
+
+    def cambiar_tamano_vista(self, valor_seleccionado):
+        """Guarda la preferencia en config.json y redibuja la pantalla"""
+        self.tamano_vista = valor_seleccionado
+        
+        try:
+            datos = {}
+            if self.archivo_config.exists():
+                with open(self.archivo_config, "r", encoding="utf-8") as f:
+                    datos = json.load(f)
+            
+            datos["Tamano_Vista"] = self.tamano_vista
+            
+            with open(self.archivo_config, "w", encoding="utf-8") as f:
+                json.dump(datos, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error guardando tamaño: {e}")
+            
+        # Redibujar la cuadrícula aplicando el filtro actual
+        self.filtrar_aplicaciones()
 
     def crear_stat_box(self, parent, titulo, valor, attr_name):
         box = ctk.CTkFrame(parent, fg_color=BG_CARD, corner_radius=10, height=65)
@@ -412,48 +454,59 @@ class MenuporAplicaciones:
             widget.destroy()
 
         if not lista_apps:
-            # INTERFAZ PARA CARPETA VACÍA O SIN COINCIDENCIAS
-            ctk.CTkLabel(
-                self.frame_scroll, 
-                text="📦 No hay aplicaciones en la carpeta\no no coinciden con la búsqueda.", 
-                font=("Segoe UI", 15), text_color=TEXT_MUTED
-            ).grid(row=0, column=1, pady=(60, 20))
-            
-            btn_refrescar = ctk.CTkButton(
-                self.frame_scroll, text="🔄 Refrescar", font=("Segoe UI", 13, "bold"),
-                fg_color=ACCENT, hover_color=ACCENT_HOVER, corner_radius=8, width=120,
-                command=self.cargar_datos_aplicaciones
-            )
+            ctk.CTkLabel(self.frame_scroll, text="📦 No hay aplicaciones en la carpeta\no no coinciden con la búsqueda.", font=("Segoe UI", 15), text_color=TEXT_MUTED).grid(row=0, column=1, pady=(60, 20))
+            btn_refrescar = ctk.CTkButton(self.frame_scroll, text="🔄 Refrescar", font=("Segoe UI", 13, "bold"), fg_color=ACCENT, hover_color=ACCENT_HOVER, corner_radius=8, width=120, command=self.cargar_datos_aplicaciones)
             btn_refrescar.grid(row=1, column=1)
             return
 
-        columnas = 3 
+        # --- LÓGICA DE ESCALADO DINÁMICO ---
+        if self.tamano_vista == "Pequeño":
+            columnas = 5
+            w_card, h_card = 120, 135
+            f_icon, f_title = 32, 11
+            btn_h, btn_w = 26, 90
+            pad_y_icon = (10, 5)
+        elif self.tamano_vista == "Mediano":
+            columnas = 4
+            w_card, h_card = 140, 155
+            f_icon, f_title = 36, 12
+            btn_h, btn_w = 28, 100
+            pad_y_icon = (12, 5)
+        else: # Grande (Original)
+            columnas = 3
+            w_card, h_card = 160, 180
+            f_icon, f_title = 42, 13
+            btn_h, btn_w = 30, 120
+            pad_y_icon = (15, 5)
+
+        # Centrar las columnas dinámicamente
+        for i in range(6): self.frame_scroll.grid_columnconfigure(i, weight=0)
+        self.frame_scroll.grid_columnconfigure(tuple(range(columnas)), weight=1)
+
         fila, col = 0, 0
 
         for exe_path in lista_apps:
             icono = self.obtener_icono_por_nombre(exe_path.stem)
 
-            # === TARJETAS ===
-            tarjeta = ctk.CTkFrame(self.frame_scroll, fg_color=BG_CARD, corner_radius=12, width=160, height=180, border_width=2, border_color=BG_CARD)
+            tarjeta = ctk.CTkFrame(self.frame_scroll, fg_color=BG_CARD, corner_radius=12, width=w_card, height=h_card, border_width=2, border_color=BG_CARD)
             tarjeta.grid_propagate(False)
             tarjeta.pack_propagate(False)
-            tarjeta.grid(row=fila, column=col, padx=10, pady=12)
+            tarjeta.grid(row=fila, column=col, padx=8, pady=8)
 
-            lbl_icono = ctk.CTkLabel(tarjeta, text=icono, font=("Segoe UI Emoji", 42))
-            lbl_icono.pack(pady=(15, 5))
+            lbl_icono = ctk.CTkLabel(tarjeta, text=icono, font=("Segoe UI Emoji", f_icon))
+            lbl_icono.pack(pady=pad_y_icon)
 
             nombre_mostrar = exe_path.stem if len(exe_path.stem) < 15 else exe_path.stem[:12] + "..."
-            lbl_nombre = ctk.CTkLabel(tarjeta, text=nombre_mostrar, font=("Segoe UI", 13, "bold"), text_color=TEXT_MAIN)
-            lbl_nombre.pack(pady=(0, 10))
+            lbl_nombre = ctk.CTkLabel(tarjeta, text=nombre_mostrar, font=("Segoe UI", f_title, "bold"), text_color=TEXT_MAIN)
+            lbl_nombre.pack(pady=(0, 5))
 
             btn_abrir = ctk.CTkButton(
-                tarjeta, text="Ejecutar", font=("Segoe UI", 12, "bold"),
-                fg_color=ACCENT, hover_color=ACCENT_HOVER, corner_radius=8, height=30, width=120,
+                tarjeta, text="Ejecutar", font=("Segoe UI", f_title-1, "bold"),
+                fg_color=ACCENT, hover_color=ACCENT_HOVER, corner_radius=8, height=btn_h, width=btn_w,
                 command=lambda e=exe_path: self.ejecutar_programa(e)
             )
-            btn_abrir.pack(side="bottom", pady=(0, 15))
+            btn_abrir.pack(side="bottom", pady=(0, 10 if self.tamano_vista == "Pequeño" else 15))
 
-            # ANIMACIÓN DE BORDE
             def hover_in(event, t=tarjeta): t.configure(border_color=ACCENT)
             def hover_out(event, t=tarjeta): t.configure(border_color=BG_CARD)
 
@@ -467,6 +520,7 @@ class MenuporAplicaciones:
                 col = 0
                 fila += 1
 
+                
     def ejecutar_programa(self, ruta_exe):
         try:
             self.root.withdraw()
