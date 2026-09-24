@@ -249,6 +249,104 @@ def revisar_y_aplicar_actualizacion_menu():
         subprocess.Popen([ruta_nuevo_menu], cwd=str(ruta_raiz), creationflags=0x08000000)
         sys.exit(0)
 
+# =========================================================
+# Class ToolTip: para agregar mensajes emergentes a cualquier widget de Tkinter
+# =========================================================
+class ToolTip:
+    def __init__(self, widget, text, delay=600):
+        self.widget = widget
+        self.text = text
+        self.delay = delay  # Tiempo en milisegundos (600ms = 0.6 segundos)
+        self.tooltip_window = None
+        self.timer_id = None
+        
+        try:
+            self.widget.bind("<Enter>", self.al_entrar)
+            self.widget.bind("<Leave>", self.al_salir)
+            self.widget.bind("<ButtonPress>", self.al_salir)
+        except NotImplementedError:
+            # Si el widget (como CTkSegmentedButton) bloquea el .bind(),
+            # lo vinculamos directamente a su lienzo (_canvas) interno.
+            if hasattr(self.widget, "_canvas"):
+                self.widget._canvas.bind("<Enter>", self.al_entrar)
+                self.widget._canvas.bind("<Leave>", self.al_salir)
+                self.widget._canvas.bind("<ButtonPress>", self.al_salir)
+
+    def al_entrar(self, event=None):
+        self.cancelar_temporizador() # Asegura que no haya duplicados
+        # Programa la aparición de la ventana después de 'delay' milisegundos
+        self.timer_id = self.widget.after(self.delay, self.mostrar_tooltip)
+
+    def al_salir(self, event=None):
+        self.cancelar_temporizador()
+        self.ocultar_tooltip()
+
+    def cancelar_temporizador(self):
+        if self.timer_id:
+            self.widget.after_cancel(self.timer_id)
+            self.timer_id = None
+
+    def mostrar_tooltip(self):
+        if self.tooltip_window:
+            return
+            
+        self.tooltip_window = tk.Toplevel(self.widget)
+        self.tooltip_window.wm_overrideredirect(True)
+        
+        # 1. TRUCO DE TRANSPARENCIA MEJORADO
+        # Usamos un negro casi puro ("#000001") en lugar de magenta para 
+        # que el suavizado de bordes se funda con el tema oscuro sin dejar rastro.
+        color_invisible = "#000001"
+        self.tooltip_window.configure(bg=color_invisible)
+        self.tooltip_window.wm_attributes("-transparentcolor", color_invisible)
+
+        # 2. CONTENEDOR CON BORDES REDONDEADOS
+        frame_tooltip = ctk.CTkFrame(self.tooltip_window, 
+                                     fg_color="#1e293b",       
+                                     corner_radius=10,         
+                                     border_width=1,           
+                                     border_color="#3b82f6")   
+        frame_tooltip.pack(padx=2, pady=2) 
+
+        # 3. TEXTO
+        label = ctk.CTkLabel(frame_tooltip, 
+                             text=self.text, 
+                             text_color="white",
+                             fg_color="transparent",
+                             font=("Segoe UI", 12),
+                             wraplength=250, 
+                             justify="left")
+        label.pack(padx=12, pady=8)
+
+        # 4. OBTENER TAMAÑO SOLICITADO
+        self.tooltip_window.update_idletasks() 
+        ancho_tooltip = frame_tooltip.winfo_reqwidth()
+        alto_tooltip = frame_tooltip.winfo_reqheight()
+        
+        ancho_pantalla = self.widget.winfo_screenwidth()
+        alto_pantalla = self.widget.winfo_screenheight()
+        
+        # 5. POSICIÓN (Centrado y ABAJO del componente)
+        x = int(self.widget.winfo_rootx() + (self.widget.winfo_width() / 2) - (ancho_tooltip / 2))
+        y = int(self.widget.winfo_rooty() + self.widget.winfo_height() + 10)
+        
+        # 6. CORRECCIÓN DE BORDES
+        # Evitar que se salga por los lados
+        if x < 0:
+            x = 10
+        elif (x + ancho_tooltip) > ancho_pantalla:
+            x = ancho_pantalla - ancho_tooltip - 10
+            
+        # Evitar que se salga por abajo (si topa abajo, lo pasa para arriba)
+        if (y + alto_tooltip) > alto_pantalla: 
+            y = int(self.widget.winfo_rooty() - alto_tooltip - 10)
+            
+        self.tooltip_window.wm_geometry(f"+{x}+{y}")
+    
+    def ocultar_tooltip(self):
+        if self.tooltip_window:
+            self.tooltip_window.destroy()
+            self.tooltip_window = None
 
 # =========================================================
 # MENÚ PRINCIPAL: EL DASHBOARD "M E N U"
@@ -327,6 +425,7 @@ class MenuporAplicaciones:
         self.header_row.pack(fill="x", pady=(0, 15))
 
         self.lbl_saludo = ctk.CTkLabel(self.header_row, text=self.obtener_saludo(), font=("Segoe UI", 24, "bold"), text_color=TEXT_MAIN)
+        #ToolTip(self.lbl_saludo, "Saludo dinámico según la hora del día")
         self.lbl_saludo.pack(side="left")
 
         # --- NUEVO: Botón selector de tamaño ---
@@ -340,6 +439,7 @@ class MenuporAplicaciones:
         )
         self.seg_tamano.set(self.tamano_vista)
         self.seg_tamano.pack(side="left", padx=20)
+        #ToolTip(self.seg_tamano, "Cambiar tamaño de vista de las aplicaciones")
 
         self.search_var = tk.StringVar()
         self.search_var.trace("w", self.filtrar_aplicaciones)
@@ -489,6 +589,10 @@ class MenuporAplicaciones:
             icono = self.obtener_icono_por_nombre(exe_path.stem)
 
             tarjeta = ctk.CTkFrame(self.frame_scroll, fg_color=BG_CARD, corner_radius=12, width=w_card, height=h_card, border_width=2, border_color=BG_CARD)
+            descripcion = self.buscar_descripcion(exe_path.stem)
+            ToolTip(tarjeta, descripcion )
+
+
             tarjeta.grid_propagate(False)
             tarjeta.pack_propagate(False)
             tarjeta.grid(row=fila, column=col, padx=8, pady=8)
@@ -514,13 +618,27 @@ class MenuporAplicaciones:
             tarjeta.bind("<Leave>", hover_out)
             lbl_icono.bind("<Enter>", hover_in)
             lbl_nombre.bind("<Enter>", hover_in)
+            
 
             col += 1
             if col >= columnas:
                 col = 0
                 fila += 1
 
-                
+    def buscar_descripcion(self, exe_name):
+        """Busca un archivo config.json con la misma base que el exe para mostrar descripción de cada aplicación"""
+        ruta_raiz = obtener_ruta_raiz_real()
+        ruta_json = os.path.join(ruta_raiz, "apps", "config.json")
+        if os.path.exists(ruta_json):
+                try:
+                    with open(ruta_json, "r", encoding="utf-8") as f:
+                        datos = json.load(f)
+                        return datos.get("Descripcion", {}).get(exe_name.lower(), "") 
+                except Exception:
+                    pass
+        
+        
+
     def ejecutar_programa(self, ruta_exe):
         try:
             self.root.withdraw()
