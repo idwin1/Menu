@@ -185,7 +185,8 @@ def revisar_y_aplicar_actualizacion_menu():
     # --- PASO 1: RELEVO ORIGINAL DEL MENÚ ---
     estado_menu = 0
     actualizaciones_activas = True
-
+    datos = {}
+    
     if os.path.exists(ruta_json):
         try:
             with open(ruta_json, "r", encoding="utf-8") as f:
@@ -193,6 +194,18 @@ def revisar_y_aplicar_actualizacion_menu():
                 estado_menu = datos.get("Estado_Menu", 0)
         except Exception:
             pass
+
+        if "Actualizaciones_Automaticas" not in datos:
+                # 3. Si no existe, se crea con el valor por defecto que desees (ej. False)
+                datos["Actualizaciones_Automaticas"] = False
+                # 4. Guardar los cambios sobrescribiendo el archivo json
+                try:
+                    with open(ruta_json, "w", encoding="utf-8") as f:
+                        # indent=4 lo formatea para que sea legible, ensure_ascii=False respeta acentos
+                        json.dump(datos, f, indent=4, ensure_ascii=False)
+                except Exception as e:
+                    print(f"Error al guardar en el archivo JSON: {e}")
+        actualizaciones_activas = datos.get("Actualizaciones_Automaticas", False)
 
     if estado_menu == 1 and os.path.exists(ruta_nuevo_menu):
         try:
@@ -216,6 +229,7 @@ def revisar_y_aplicar_actualizacion_menu():
     # --- PASO 2: EJECUCIÓN DEL ACTUALIZADOR ---
     if os.path.exists(ruta_actualizador):
         if actualizaciones_activas:
+            print("actualizaciones automáticas activadas por config.json, lanzando actualizador...")
             ejecutar_actualizador_con_ui(ruta_actualizador)
         else:
             print("Las actualizaciones automáticas están desactivadas por config.json")
@@ -223,6 +237,7 @@ def revisar_y_aplicar_actualizacion_menu():
     # --- PASO 3: LECTURA POST-ACTUALIZACIÓN ---
     estado_menu = 0
     estado_actualizador = 0
+    
     if os.path.exists(ruta_json):
         try:
             with open(ruta_json, "r", encoding="utf-8") as f:
