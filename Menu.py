@@ -10,6 +10,7 @@ import threading
 import customtkinter as ctk
 from datetime import datetime
 import time
+from PIL import Image
 
 # Intentamos importar psutil para el hardware, si no está, no rompemos el programa
 try:
@@ -31,16 +32,90 @@ def obtener_ruta_raiz_real():
 
 # =========================================================
 # PALETA DE COLORES "DEEP ZINC" (Ultra Moderna)
-# =========================================================
-BG_APP = "#09090b"
-BG_SIDEBAR = "#18181b"
-BG_CARD = "#27272a"
-BG_CARD_HOVER = "#3f3f46"
-ACCENT = "#3b82f6"
-ACCENT_HOVER = "#2563eb"
-BORDER = "#3f3f46"
-TEXT_MAIN = "#fafafa"
-TEXT_MUTED = "#a1a1aa"
+# =========================================================            
+
+def obtener_tema_estacional():
+    mes = datetime.now().month
+    
+    # --- TEMA HALLOWEEN (Octubre) ---
+    if mes == 10:
+        return {
+            "BG_APP": "#100a14",         # Morado casi negro
+            "BG_SIDEBAR": "#0a060d",     # Fondo lateral oscuro
+            "BG_CARD": "#1f1426",        # Cartas morado oscuro
+            "BG_CARD_HOVER": "#33213d",
+            "ACCENT": "#ff6a00",         # Naranja vibrante calabaza
+            "ACCENT_HOVER": "#cc5500",
+            "BORDER": "#ff6a00",         # Bordes naranjas
+            "TEXT_MAIN": "#fafafa",
+            "TEXT_MUTED": "#a89da8",
+            "ICONO_PRINCIPAL": "🎃",
+            "SALUDO_EXTRA": " 🦇",
+            "BORDER_CARD": "#331600",       # Un naranja muy oscuro/apagado para el estado normal
+            "BORDER_CARD_HOVER": "#ff6a00",  # Naranja vibrante estilo neón al pasar el mouse
+            "COLOR_ICONO": "#ff6a00"
+        }
+    # --- TEMA NAVIDAD (Diciembre) ---
+    elif mes == 12:
+        return {
+            "BG_APP": "#070a12",         # Azul marino abismal
+            "BG_SIDEBAR": "#04060b",     # Profundidad máxima para el sidebar
+            "BG_CARD": "#0e1526",        # Cartas azul oscuro
+            "BG_CARD_HOVER": "#162038",
+            "ACCENT": "#0ea5e9",         # Azul hielo/cyan vibrante
+            "ACCENT_HOVER": "#0284c7",
+            "BORDER": "#1e293b",
+            "TEXT_MAIN": "#f8fafc",      # Blanco nieve
+            "TEXT_MUTED": "#94a3b8",
+            "ICONO_PRINCIPAL": "❄️",
+            "SALUDO_EXTRA": " ⛄"
+        }
+        
+    # --- TEMA POR DEFECTO (Deep Zinc) ---
+    return {
+        "BG_APP": "#09090b",
+        "BG_SIDEBAR": "#18181b",
+        "BG_CARD": "#27272a",
+        "BG_CARD_HOVER": "#3f3f46",
+        "ACCENT": "#3b82f6",
+        "ACCENT_HOVER": "#2563eb",
+        "BORDER": "#3f3f46",
+        "TEXT_MAIN": "#fafafa",
+        "TEXT_MUTED": "#a1a1aa",
+        "ICONO_PRINCIPAL": "⚡",
+        "SALUDO_EXTRA": ""
+    }
+
+# Aplicamos el tema
+TEMA = obtener_tema_estacional()
+BG_APP = TEMA["BG_APP"]
+BG_SIDEBAR = TEMA["BG_SIDEBAR"]
+BG_CARD = TEMA["BG_CARD"]
+BG_CARD_HOVER = TEMA["BG_CARD_HOVER"]
+ACCENT = TEMA["ACCENT"]
+ACCENT_HOVER = TEMA["ACCENT_HOVER"]
+BORDER = TEMA["BORDER"]
+TEXT_MAIN = TEMA["TEXT_MAIN"]
+TEXT_MUTED = TEMA["TEXT_MUTED"]
+
+def Marca_de_agua(ventana):
+    mes = datetime.now().month
+    """Agrega una marca de agua discreta en la esquina inferior derecha"""
+    if mes == 10:
+        try:
+            marca_agua = ctk.CTkLabel(ventana, text="🕸️", font=("Segoe UI Emoji", 120), text_color="#1a111e")
+            marca_agua.place(relx=0.5, rely=0.8, anchor="center")
+        except Exception:
+            pass
+    if mes == 12:
+        try:
+            marca_agua = ctk.CTkLabel(ventana, text="❄️", font=("Segoe UI Emoji", 120), text_color="#d9ddde")
+            marca_agua.place(relx=0.5, rely=0.7, anchor="center")
+        except Exception:
+            pass
+    
+
+
 
 # =========================================================
 # ACTUALIZADOR (Diseño Moderno + Lógica Robusta)
@@ -320,7 +395,7 @@ class ToolTip:
                                      fg_color="#1e293b",       
                                      corner_radius=10,         
                                      border_width=1,           
-                                     border_color="#3b82f6")   
+                                     border_color=BORDER)#"#3b82f6")   
         frame_tooltip.pack(padx=2, pady=2) 
 
         # 3. TEXTO
@@ -420,9 +495,11 @@ class MenuporAplicaciones:
         self.sidebar.pack(side="left", fill="y")
         self.sidebar.pack_propagate(False)
 
-        ctk.CTkLabel(self.sidebar, text="⚡", font=("Segoe UI Emoji", 38)).pack(pady=(25, 5))
+        ctk.CTkLabel(self.sidebar, text=TEMA["ICONO_PRINCIPAL"], font=("Segoe UI Emoji", 38)).pack(pady=(25, 5))
         ctk.CTkLabel(self.sidebar, text="M E N U", font=("Segoe UI", 20, "bold"), text_color=ACCENT).pack()
         ctk.CTkLabel(self.sidebar, text="Control Center", font=("Segoe UI", 11), text_color=TEXT_MUTED).pack(pady=(0, 30))
+
+        Marca_de_agua(self.sidebar)
 
         self.frame_reloj = ctk.CTkFrame(self.sidebar, fg_color="transparent")
         self.frame_reloj.pack(side="bottom", pady=25)
@@ -430,6 +507,7 @@ class MenuporAplicaciones:
         self.lbl_hora.pack()
         self.lbl_fecha = ctk.CTkLabel(self.frame_reloj, text="Lunes, 1 Enero", font=("Segoe UI", 11), text_color=TEXT_MUTED)
         self.lbl_fecha.pack()
+        
 
         # ---------------- ÁREA PRINCIPAL (DERECHA) ----------------
         self.main_area = ctk.CTkFrame(self.root, fg_color="transparent")
@@ -439,7 +517,7 @@ class MenuporAplicaciones:
         self.header_row = ctk.CTkFrame(self.main_area, fg_color="transparent")
         self.header_row.pack(fill="x", pady=(0, 15))
 
-        self.lbl_saludo = ctk.CTkLabel(self.header_row, text=self.obtener_saludo(), font=("Segoe UI", 24, "bold"), text_color=TEXT_MAIN)
+        self.lbl_saludo = ctk.CTkLabel(self.header_row, text=self.obtener_saludo() + TEMA["SALUDO_EXTRA"], font=("Segoe UI", 24, "bold"), text_color=TEXT_MAIN)
         #ToolTip(self.lbl_saludo, "Saludo dinámico según la hora del día")
         self.lbl_saludo.pack(side="left")
 
@@ -476,6 +554,7 @@ class MenuporAplicaciones:
         self.frame_scroll = ctk.CTkScrollableFrame(self.main_area, fg_color="transparent")
         self.frame_scroll.pack(fill="both", expand=True)
         self.frame_scroll.grid_columnconfigure((0, 1, 2), weight=1)
+        
 
     def cambiar_tamano_vista(self, valor_seleccionado):
         """Guarda la preferencia en config.json y redibuja la pantalla"""
@@ -667,6 +746,7 @@ class MenuporAplicaciones:
             self.search_var.set("") 
             self.cargar_datos_aplicaciones()
             self.root.deiconify()
+
 
 
 if __name__ == "__main__":
