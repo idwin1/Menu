@@ -10,7 +10,6 @@ import threading
 import customtkinter as ctk
 from datetime import datetime
 import time
-from PIL import Image
 
 # Intentamos importar psutil para el hardware, si no está, no rompemos el programa
 try:
